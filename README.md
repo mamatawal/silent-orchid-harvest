@@ -104,48 +104,44 @@ docker compose up --build
 
 ---
 
-# Q2 – Unread Announcements Listing
+# Q3 – Mark Announcement as Read
 
 **API endpoint:**
 
 ```
-GET /api/v1/announcements/unread?customer_id={id}
+POST /api/v1/announcements/mark-read
+Content-Type: application/json
+
+{
+  "announcement_id": 2,
+  "customer_id": 1
+}
 ```
 
-Returns all announcements that the given customer has **not** yet read, ordered newest-first.
+Records the specified customer as having read the specified announcement.
+Calling it again on an already-read announcement is safe (idempotent — no duplicate rows).
 
-**ORM implementation** (`AnnouncementController::unread`):
+**Frontend:** Navigate to **Mark as Read** in the navbar (http://localhost:5173/mark-read).
 
-```php
-$unread = Announcement::whereDoesntHave('readByCustomers', function ($query) use ($customerId) {
-    $query->where('customer_id', $customerId);
-})->latest()->get();
-```
+Fill in:
+- **Announcement ID** — numeric input (1–5)
+- **Customer ID** — numeric input (1–2)
+- Press **Submit**
 
-Eloquent's `whereDoesntHave` generates the following SQL (example for `customer_id = 1`):
-
-```sql
-SELECT *
-FROM `announcements`
-WHERE NOT EXISTS (
-    SELECT *
-    FROM `announcement_customer`
-    WHERE `announcements`.`id` = `announcement_customer`.`announcement_id`
-      AND `announcement_customer`.`customer_id` = 1
-)
-ORDER BY `created_at` DESC
-```
-
-**Frontend:** Open http://localhost:5173 — the home page shows the unread announcements list with a customer selector dropdown.
+A success or validation-error message is shown below the button.
 
 **Verify via API directly:**
 
 ```bash
-# Unread announcements for customer #1
-curl http://localhost:8000/api/v1/announcements/unread?customer_id=1
+curl -X POST http://localhost:8000/api/v1/announcements/mark-read \
+  -H "Content-Type: application/json" \
+  -d '{"announcement_id": 2, "customer_id": 1}'
+```
 
-# Unread announcements for customer #2
-curl http://localhost:8000/api/v1/announcements/unread?customer_id=2
+Then confirm in the unread list — announcement #2 will no longer appear for customer #1:
+
+```bash
+curl http://localhost:8000/api/v1/announcements/unread?customer_id=1
 ```
 
 ---
@@ -157,7 +153,7 @@ curl http://localhost:8000/api/v1/announcements/unread?customer_id=2
 | Q4 | ✅ Environment setup and project structure |
 | Q1 | ✅ Migrations, models, and seeded data |
 | Q2 | ✅ Unread announcements listing (ORM + frontend) |
-| Q3 | 🔜 Mark announcement as read |
+| Q3 | ✅ Mark announcement as read (form + API) |
 
 ---
 
@@ -189,14 +185,13 @@ All final code, project structure decisions, ORM implementation, validation flow
 
 ### Time Spent
 
-PR3 – Unread announcements listing (Q2)
+PR4 – Mark announcement as read (Q3)
 
-Approximately 30 minutes
+Approximately 20 minutes
 
 Tasks included:
-- `AnnouncementController` with `unread` endpoint using Eloquent `whereDoesntHave`
-- `customers` endpoint for the frontend customer selector
-- API routes registered in `api.php`
-- TypeScript interfaces for `Announcement` and `Customer`
-- `UnreadAnnouncements` React page with customer selector dropdown
-- README documentation including the ORM-generated SQL query
+- `markAsRead` method in `AnnouncementController` with Laravel validation
+- `POST /api/v1/announcements/mark-read` route
+- `MarkAsRead` React page with numeric Announcement ID / Customer ID inputs and Submit button
+- Inline success and validation-error feedback
+- README documentation for Q3

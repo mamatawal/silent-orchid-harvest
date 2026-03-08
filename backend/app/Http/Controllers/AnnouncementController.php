@@ -33,6 +33,42 @@ class AnnouncementController extends Controller
     }
 
     /**
+     * Mark an announcement as read for a specific customer.
+     *
+     * POST /api/v1/announcements/mark-read
+     * Body: { "announcement_id": 2, "customer_id": 1 }
+     */
+    public function markAsRead(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'announcement_id' => ['required', 'integer', 'exists:announcements,id'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+        ]);
+
+        $customer = Customer::findOrFail($validated['customer_id']);
+        $announcement = Announcement::findOrFail($validated['announcement_id']);
+
+        // syncWithoutDetaching prevents duplicate pivot rows
+        $customer->readAnnouncements()->syncWithoutDetaching([
+            $announcement->id => ['read_at' => now()],
+        ]);
+
+        return response()->json([
+            'message' => 'Announcement marked as read.',
+            'customer' => $customer,
+            'announcement' => $announcement,
+        ]);
+    }
+
+    /**
+     * Return all announcements.
+     */
+    public function index(): JsonResponse
+    {
+        return response()->json(Announcement::orderBy('id')->get());
+    }
+
+    /**
      * Return all customers.
      */
     public function customers(): JsonResponse
