@@ -1,61 +1,26 @@
 # AnnounceKit Simplified – Tyrell Systems Technical Assessment
 
-This project implements a simplified version of the AnnounceKit announcement system.
+A simplified version of the AnnounceKit platform: a list of unread announcements per customer.
 
-The goal of this assessment is to build a system where customers can view announcements and track which announcements have been read.
-
----
-
-# Tech Stack
-
-Backend
-- PHP
-- Laravel
-
-Frontend
-- React
-- TypeScript
-- TailwindCSS
-
-Database
-- MySQL
-
-Environment
-- Docker
+**Stack:** Laravel 11 (PHP 8.3) · React 18 + TypeScript · Tailwind CSS · MySQL 8.4 · Docker
 
 ---
 
-# Project Structure
+## Table of Contents
 
-```
-.
-├── docker-compose.yml          # Orchestrates all three services
-├── backend/                    # Laravel 11 application
-│   ├── Dockerfile
-│   ├── app/
-│   │   ├── Http/Controllers/
-│   │   └── Models/
-│   ├── database/
-│   │   ├── migrations/
-│   │   └── seeders/
-│   └── routes/
-│       └── api.php
-└── frontend/                   # React 18 + TypeScript + Vite + Tailwind
-    ├── Dockerfile
-    ├── src/
-    │   ├── api/client.ts
-    │   ├── components/
-    │   │   └── Navbar.tsx
-    │   ├── pages/
-    │   ├── types/index.ts
-    │   ├── App.tsx
-    │   └── main.tsx
-    └── package.json
-```
+1. [Prerequisites](#prerequisites)
+2. [Quick Start](#quick-start)
+3. [Q1 – Seeded Data](#q1--seeded-data)
+4. [Q2 – Unread Announcements (ORM Query)](#q2--unread-announcements-orm-query)
+5. [Q3 – Mark Announcement as Read](#q3--mark-announcement-as-read)
+6. [Q4 – Environment & Project Setup](#q4--environment--project-setup)
+7. [API Reference](#api-reference)
+8. [AI Usage Disclosure](#ai-usage-disclosure)
+9. [Time Spent](#time-spent)
 
 ---
 
-# Prerequisites
+## Prerequisites
 
 | Tool | Minimum version |
 |------|-----------------|
@@ -67,7 +32,7 @@ No local PHP, Node.js, or MySQL installation is required – everything runs ins
 
 ---
 
-# Quick Start
+## Quick Start
 
 ```bash
 # 1. Clone the repository
@@ -82,7 +47,7 @@ On first boot the backend container will automatically:
 1. Run `composer install`
 2. Generate an `APP_KEY`
 3. Run all database migrations
-4. Run the database seeder
+4. Run the database seeder (creates 5 announcements, 2 customers, and marks announcement #1 as read by customer #1)
 
 | Service | URL |
 |---------|-----|
@@ -104,58 +69,167 @@ docker compose up --build
 
 ---
 
-# Q3 – Mark Announcement as Read
+## Q1 – Seeded Data
 
-**API endpoint:**
+The seeder (`database/seeders/AnnouncementSeeder.php`) runs automatically on every boot and is idempotent (safe to run multiple times):
 
+| # | Action |
+|---|--------|
+| 1 | Creates **5 announcements** (Welcome to AnnounceKit, New Dashboard Released, Performance Improvements, Bug Fix: Notification Delays, Upcoming Maintenance Window) |
+| 2 | Creates **2 customers**: Mohammad (ID 1) and Awaludin (ID 2) |
+| 3 | Marks **announcement #1** as read by **customer #1** (Mohammad) via the `announcement_customer` pivot table |
+
+To re-run the seeder manually (resets the DB first):
+
+```bash
+docker compose exec backend php artisan migrate:fresh --seed
 ```
-POST /api/v1/announcements/mark-read
-Content-Type: application/json
 
-{
-  "announcement_id": 2,
-  "customer_id": 1
-}
+To verify seeded data directly:
+
+```bash
+docker compose exec mysql mysql -u tyrell -psecret announcekit \
+  -e "SELECT * FROM announcements; SELECT * FROM customers; SELECT * FROM announcement_customer;"
 ```
 
-Records the specified customer as having read the specified announcement.
-Calling it again on an already-read announcement is safe (idempotent — no duplicate rows).
+---
 
-**Frontend:** Navigate to **Mark as Read** in the navbar (http://localhost:5173/mark-read).
+## Q2 – Unread Announcements (ORM Query)
 
-Fill in:
-- **Announcement ID** — numeric input (1–5)
-- **Customer ID** — numeric input (1–2)
-- Press **Submit**
+### How to use the UI
 
-A success or validation-error message is shown below the button.
+1. Open http://localhost:5173 in Chrome.
+2. The **Unread Announcements** page loads automatically.
+3. Use the **customer dropdown** to pick a customer.
+4. The page instantly shows all announcements that customer has **not yet read**.
 
-**Verify via API directly:**
+Because announcement #1 is pre-marked as read by Mohammad (Customer #1), Mohammad will see **4 unread** announcements on first load. Awaludin (Customer #2) has read nothing, so he sees all **5**.
+
+### Generated SQL Query
+
+The Eloquent ORM uses `whereDoesntHave` to generate the following SQL (example for `customer_id = 1`):
+
+```sql
+SELECT *
+FROM `announcements`
+WHERE NOT EXISTS (
+    SELECT *
+    FROM `announcement_customer`
+    WHERE `announcements`.`id` = `announcement_customer`.`announcement_id`
+      AND `announcement_customer`.`customer_id` = 1
+)
+ORDER BY `created_at` DESC
+```
+
+### Eloquent source code
+
+```php
+// app/Http/Controllers/AnnouncementController.php
+
+$unread = Announcement::whereDoesntHave('readByCustomers', function ($query) use ($customerId) {
+    $query->where('customer_id', $customerId);
+})->latest()->get();
+```
+
+---
+
+## Q3 – Mark Announcement as Read
+
+### Using the UI
+
+1. Open http://localhost:5173 in Chrome.
+2. Click **Mark as Read** in the navigation bar.
+3. Use the **Reference** tables on the page to look up the correct Announcement ID and Customer ID.
+4. Enter the numeric **Announcement ID** and **Customer ID** into the form.
+5. Click **Submit**.
+6. A success message confirms which customer was recorded as having read which announcement.
+
+> **Note:** Submitting the same combination a second time is safe – the backend uses `syncWithoutDetaching`, which is idempotent (no duplicate rows are inserted).
+
+### Using curl / the API directly
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/announcements/mark-read \
-  -H "Content-Type: application/json" \
-  -d '{"announcement_id": 2, "customer_id": 1}'
+     -H "Content-Type: application/json" \
+     -d '{"announcement_id": 2, "customer_id": 1}'
 ```
 
-Then confirm in the unread list — announcement #2 will no longer appear for customer #1:
+Example success response:
 
-```bash
-curl http://localhost:8000/api/v1/announcements/unread?customer_id=1
+```json
+{
+  "message": "Announcement marked as read.",
+  "customer": { "id": 1, "name": "Mohammad", "email": "mohammad@example.com" },
+  "announcement": { "id": 2, "title": "New Dashboard Released" }
+}
 ```
 
 ---
 
-# Development Status
+## Q4 – Environment & Project Setup
 
-| Question | Status |
-|----------|--------|
-| Q4 | ✅ Environment setup and project structure |
-| Q1 | ✅ Migrations, models, and seeded data |
-| Q2 | ✅ Unread announcements listing (ORM + frontend) |
-| Q3 | ✅ Mark announcement as read (form + API) |
+### Project structure
 
----
+```
+.
+├── docker-compose.yml              # Orchestrates all three services
+├── backend/                        # Laravel 11 application
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── Http/Controllers/
+│   │   │   └── AnnouncementController.php
+│   │   └── Models/
+│   │       ├── Announcement.php
+│   │       └── Customer.php
+│   ├── database/
+│   │   ├── migrations/
+│   │   │   ├── ..._create_customers_table.php
+│   │   │   ├── ..._create_announcements_table.php
+│   │   │   └── ..._create_announcement_customer_table.php
+│   │   └── seeders/
+│   │       ├── AnnouncementSeeder.php
+│   │       └── DatabaseSeeder.php
+│   └── routes/
+│       └── api.php
+└── frontend/                       # React 18 + TypeScript + Vite + Tailwind
+    ├── Dockerfile
+    ├── src/
+    │   ├── api/client.ts
+    │   ├── components/
+    │   │   └── Navbar.tsx
+    │   ├── pages/
+    │   │   ├── UnreadAnnouncements.tsx
+    │   │   └── MarkAsRead.tsx
+    │   ├── types/index.ts
+    │   ├── App.tsx
+    │   └── main.tsx
+    └── package.json
+```
+
+### Database schema
+
+```
+customers
+  id            BIGINT UNSIGNED  PK  AUTO_INCREMENT
+  name          VARCHAR(255)
+  email         VARCHAR(255)     UNIQUE
+  created_at    TIMESTAMP
+  updated_at    TIMESTAMP
+
+announcements
+  id            BIGINT UNSIGNED  PK  AUTO_INCREMENT
+  title         VARCHAR(255)
+  body          TEXT
+  created_at    TIMESTAMP
+  updated_at    TIMESTAMP
+
+announcement_customer          ← pivot table
+  id              BIGINT UNSIGNED  PK  AUTO_INCREMENT
+  announcement_id BIGINT UNSIGNED  FK → announcements.id  ON DELETE CASCADE
+  customer_id     BIGINT UNSIGNED  FK → customers.id      ON DELETE CASCADE
+  read_at         TIMESTAMP
+  UNIQUE (announcement_id, customer_id)
+```
 
 ### Environment variables
 
@@ -171,7 +245,27 @@ All environment variables for the backend are managed inside `docker-compose.yml
 
 ---
 
-### AI Usage Disclosure
+## API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/customers` | List all customers |
+| `GET` | `/api/v1/announcements` | List all announcements |
+| `GET` | `/api/v1/announcements/unread?customer_id={id}` | Unread announcements for a customer |
+| `POST` | `/api/v1/announcements/mark-read` | Mark an announcement as read |
+
+POST body for `/mark-read`:
+
+```json
+{
+  "announcement_id": 2,
+  "customer_id": 1
+}
+```
+
+---
+
+## AI Usage Disclosure
 
 AI tools were used during this assessment as follows:
 
@@ -183,15 +277,14 @@ All final code, project structure decisions, ORM implementation, validation flow
 
 ---
 
-### Time Spent
+## Time Spent
 
-PR4 – Mark announcement as read (Q3)
+| Activity | Time |
+|----------|------|
+| Reading assessment & planning | ~20 min |
+| Docker & environment setup | ~20 min |
+| Laravel backend (models, migrations, controllers, seeders) | ~40 min |
+| React frontend (components, pages, API integration) | ~40 min |
+| README & documentation | ~20 min |
+| **Total** | **~2 h 20 min** |
 
-Approximately 20 minutes
-
-Tasks included:
-- `markAsRead` method in `AnnouncementController` with Laravel validation
-- `POST /api/v1/announcements/mark-read` route
-- `MarkAsRead` React page with numeric Announcement ID / Customer ID inputs and Submit button
-- Inline success and validation-error feedback
-- README documentation for Q3
