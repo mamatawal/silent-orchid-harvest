@@ -1,0 +1,1 @@
+// Implementation TypeScript interfaces here
