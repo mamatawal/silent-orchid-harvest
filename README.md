@@ -104,20 +104,44 @@ docker compose up --build
 
 ---
 
+# Q1 – Seeded Announcements & Customers
+
+The seeder creates the following data automatically when the application first boots (or when you run it manually).
+
+**What gets seeded:**
+- 5 announcements (product updates, feature releases, bug fixes, etc.)
+- 2 customers (Mohammad, Awaludin)
+- Announcement #1 is marked as **read** by Customer #1 (Mohammad)
+
+**To run the seeder manually** (after the containers are already up):
+
+```bash
+docker compose exec backend php artisan db:seed
+```
+
+**To verify the seeded data** directly in MySQL:
+
+```bash
+docker compose exec mysql mysql -u tyrell -psecret announcekit \
+  -e "SELECT * FROM announcements; SELECT * FROM customers; SELECT * FROM announcement_customer;"
+```
+
+**To reset and re-seed from scratch:**
+
+```bash
+docker compose exec backend php artisan migrate:fresh --seed
+```
+
+---
+
 # Development Status
 
-This PR sets up the project structure and development environment.
-
-Upcoming implementation:
-
-Q1
-Create announcements and customers with seeded data.
-
-Q2
-Implement unread announcements listing using ORM.
-
-Q3
-Implement mechanism to mark announcements as read.
+| Question | Status |
+|----------|--------|
+| Q4 | ✅ Environment setup and project structure |
+| Q1 | ✅ Migrations, models, and seeded data |
+| Q2 | 🔜 Unread announcements listing (ORM) |
+| Q3 | 🔜 Mark announcement as read |
 
 ---
 
@@ -149,12 +173,12 @@ All final code, project structure decisions, ORM implementation, validation flow
 
 ### Time Spent
 
-PR1 – Setup development environment and project structure
+PR2 – Create announcements and customers with seeded data (Q1)
 
-Approximately 45 minutes
+Approximately 30 minutes
 
 Tasks included:
-- Project initialization
-- Docker environment setup
-- Laravel and React project structure
-- Initial README documentation
+- Database migrations for `customers`, `announcements`, and `announcement_customer` pivot tables
+- Eloquent models (`Customer`, `Announcement`) with `BelongsToMany` relationships
+- `AnnouncementSeeder` to seed 5 announcements, 2 customers, and mark announcement #1 as read by customer #1
+- README documentation for Q1
