@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import UnreadAnnouncements from './pages/UnreadAnnouncements'
+import MarkAsRead from './pages/MarkAsRead'
 
 export default function App() {
   return (
@@ -9,6 +10,7 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<UnreadAnnouncements />} />
+          <Route path="/mark-read" element={<MarkAsRead />} />
         </Routes>
       </main>
     </div>

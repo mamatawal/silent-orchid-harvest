@@ -11,5 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::get('/customers', [AnnouncementController::class, 'customers']);
+    Route::get('/announcements', [AnnouncementController::class, 'index']);
     Route::get('/announcements/unread', [AnnouncementController::class, 'unread']);
+    Route::post('/announcements/mark-read', [AnnouncementController::class, 'markAsRead']);
 });
