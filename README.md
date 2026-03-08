@@ -104,32 +104,48 @@ docker compose up --build
 
 ---
 
-# Q1 – Seeded Announcements & Customers
+# Q2 – Unread Announcements Listing
 
-The seeder creates the following data automatically when the application first boots (or when you run it manually).
+**API endpoint:**
 
-**What gets seeded:**
-- 5 announcements (product updates, feature releases, bug fixes, etc.)
-- 2 customers (Mohammad, Awaludin)
-- Announcement #1 is marked as **read** by Customer #1 (Mohammad)
-
-**To run the seeder manually** (after the containers are already up):
-
-```bash
-docker compose exec backend php artisan db:seed
+```
+GET /api/v1/announcements/unread?customer_id={id}
 ```
 
-**To verify the seeded data** directly in MySQL:
+Returns all announcements that the given customer has **not** yet read, ordered newest-first.
 
-```bash
-docker compose exec mysql mysql -u tyrell -psecret announcekit \
-  -e "SELECT * FROM announcements; SELECT * FROM customers; SELECT * FROM announcement_customer;"
+**ORM implementation** (`AnnouncementController::unread`):
+
+```php
+$unread = Announcement::whereDoesntHave('readByCustomers', function ($query) use ($customerId) {
+    $query->where('customer_id', $customerId);
+})->latest()->get();
 ```
 
-**To reset and re-seed from scratch:**
+Eloquent's `whereDoesntHave` generates the following SQL (example for `customer_id = 1`):
+
+```sql
+SELECT *
+FROM `announcements`
+WHERE NOT EXISTS (
+    SELECT *
+    FROM `announcement_customer`
+    WHERE `announcements`.`id` = `announcement_customer`.`announcement_id`
+      AND `announcement_customer`.`customer_id` = 1
+)
+ORDER BY `created_at` DESC
+```
+
+**Frontend:** Open http://localhost:5173 — the home page shows the unread announcements list with a customer selector dropdown.
+
+**Verify via API directly:**
 
 ```bash
-docker compose exec backend php artisan migrate:fresh --seed
+# Unread announcements for customer #1
+curl http://localhost:8000/api/v1/announcements/unread?customer_id=1
+
+# Unread announcements for customer #2
+curl http://localhost:8000/api/v1/announcements/unread?customer_id=2
 ```
 
 ---
@@ -140,7 +156,7 @@ docker compose exec backend php artisan migrate:fresh --seed
 |----------|--------|
 | Q4 | ✅ Environment setup and project structure |
 | Q1 | ✅ Migrations, models, and seeded data |
-| Q2 | 🔜 Unread announcements listing (ORM) |
+| Q2 | ✅ Unread announcements listing (ORM + frontend) |
 | Q3 | 🔜 Mark announcement as read |
 
 ---
@@ -173,12 +189,14 @@ All final code, project structure decisions, ORM implementation, validation flow
 
 ### Time Spent
 
-PR2 – Create announcements and customers with seeded data (Q1)
+PR3 – Unread announcements listing (Q2)
 
 Approximately 30 minutes
 
 Tasks included:
-- Database migrations for `customers`, `announcements`, and `announcement_customer` pivot tables
-- Eloquent models (`Customer`, `Announcement`) with `BelongsToMany` relationships
-- `AnnouncementSeeder` to seed 5 announcements, 2 customers, and mark announcement #1 as read by customer #1
-- README documentation for Q1
+- `AnnouncementController` with `unread` endpoint using Eloquent `whereDoesntHave`
+- `customers` endpoint for the frontend customer selector
+- API routes registered in `api.php`
+- TypeScript interfaces for `Announcement` and `Customer`
+- `UnreadAnnouncements` React page with customer selector dropdown
+- README documentation including the ORM-generated SQL query

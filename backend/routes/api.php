@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnnouncementController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -9,5 +10,6 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
-    // api routes implementation here
+    Route::get('/customers', [AnnouncementController::class, 'customers']);
+    Route::get('/announcements/unread', [AnnouncementController::class, 'unread']);
 });
