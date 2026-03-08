@@ -40,7 +40,9 @@ services:
       mysql:
         condition: service_healthy
     command: >
-      sh -c "composer install --no-interaction &&
+      sh -c "mkdir -p bootstrap/cache storage/logs storage/framework/cache storage/framework/sessions storage/framework/views &&
+             chmod -R 775 bootstrap/cache storage &&
+             composer install --no-interaction &&
              ([ -f .env ] || cp .env.example .env) &&
              php artisan key:generate --force &&
              php artisan migrate --force &&
